@@ -5,25 +5,26 @@ import time
 import serial
 
 from syspanel.config import (
-    ARDUINO_PID,
-    ARDUINO_VID,
-    BAUD_RATE,
+    CONFIG,
+    DISPLAY,
     GPU_BACKEND,
-    LCD_COLUMNS,
-    LCD_ROWS,
     REFRESH_RATE,
+    TRANSPORT,
+    save_config,
 )
-from syspanel.monitor import create_screen
-from syspanel.serial_display import (
+from syspanel.displays import render
+from syspanel.monitor import get_hardware_stats
+from syspanel.sensors import (
+    get_cpu_temp,
+    get_cpu_usage,
+    get_gpu_backend,
+    get_gpu_stats,
+)
+from syspanel.transports import (
     close,
     connect,
     find_arduino,
     send,
-)
-from syspanel.sensors import (
-    get_cpu_temp,
-    get_cpu_usage,
-    get_gpu_stats,
 )
 
 
@@ -38,7 +39,9 @@ def run_monitor():
             arduino = connect()
 
         try:
-            screen = create_screen()
+            stats = get_hardware_stats()
+            screen = render(stats)
+
             send(arduino, screen)
 
             time.sleep(REFRESH_RATE)
@@ -52,44 +55,29 @@ def run_monitor():
 
 def start_service():
     result = subprocess.run(
-        [
-            "systemctl",
-            "--user",
-            "start",
-            SERVICE_NAME,
-        ]
+        ["systemctl", "--user", "start", SERVICE_NAME]
     )
 
     if result.returncode == 0:
-        print("syspanel started.")
+        print("SysPanel started.")
 
 
 def stop_service():
     result = subprocess.run(
-        [
-            "systemctl",
-            "--user",
-            "stop",
-            SERVICE_NAME,
-        ]
+        ["systemctl", "--user", "stop", SERVICE_NAME]
     )
 
     if result.returncode == 0:
-        print("syspanel stopped.")
+        print("SysPanel stopped.")
 
 
 def restart_service():
     result = subprocess.run(
-        [
-            "systemctl",
-            "--user",
-            "restart",
-            SERVICE_NAME,
-        ]
+        ["systemctl", "--user", "restart", SERVICE_NAME]
     )
 
     if result.returncode == 0:
-        print("syspanel restarted.")
+        print("SysPanel restarted.")
 
 
 def show_status():
@@ -107,158 +95,195 @@ def show_status():
     service_status = result.stdout.strip()
 
     if service_status == "active":
-        print("syspanel: running")
+        print("SysPanel: running")
     else:
-        print("syspanel: stopped")
+        print("SysPanel: stopped")
 
     port = find_arduino()
 
+    print("Display: LCD 20x4")
+
     if port is None:
-        print("Display: disconnected")
+        print("Transport: USB Serial (disconnected)")
     else:
-        print(f"Display: connected ({port})")
+        print(f"Transport: USB Serial ({port})")
 
     cpu_temp = get_cpu_temp()
     cpu_usage = get_cpu_usage()
 
+    gpu_backend = get_gpu_backend()
     gpu_temp, gpu_usage = get_gpu_stats()
 
     print()
     print(f"CPU: {cpu_temp:.0f}C, {cpu_usage:.0f}%")
-    print(f"GPU: {gpu_temp}C, {gpu_usage}%")
+    print(
+        f"GPU: {gpu_backend.upper()}, "
+        f"{gpu_temp}C, {gpu_usage}%"
+    )
 
 
 def show_devices():
     port = find_arduino()
 
     if port is None:
-        print("No supported displays found.")
-        return
-
-    print(f"Arduino LCD: {port}")
+        print("No SysPanel device detected.")
+    else:
+        print(f"Arduino: {port}")
 
 
 def test_display():
-    port = find_arduino()
-
-    if port is None:
-        print("Arduino LCD not found.")
-        return
-
     arduino = connect()
 
     try:
         message = (
             "<"
-            "SYPANEL TEST         \n"
-            "Display connected   \n"
-            "Serial working      \n"
-            "Test successful     "
+            "SysPanel Test\n"
+            "Display OK\n"
+            "Serial OK\n"
+            "Ready"
             ">"
         )
 
         send(arduino, message)
 
-        print("Test screen sent.")
+        print("Test message sent.")
 
     finally:
         close(arduino)
 
 
 def show_config():
-    print("syspanel configuration")
+    print("SysPanel configuration")
     print()
 
-    print(f"Display:      {LCD_COLUMNS}x{LCD_ROWS}")
+    print(f"Display:      {DISPLAY}")
+    print(f"Transport:    {TRANSPORT}")
     print(f"Refresh rate: {REFRESH_RATE}s")
-    print(f"GPU backend:  {GPU_BACKEND}")
-    print(f"Baud rate:    {BAUD_RATE}")
-    print(f"Arduino VID:  {ARDUINO_VID:#06x}")
-    print(f"Arduino PID:  {ARDUINO_PID:#06x}")
+    print(f"GPU:          {GPU_BACKEND}")
+
+
+def set_refresh_rate(value):
+    try:
+        refresh_rate = float(value)
+
+    except ValueError:
+        print("Refresh rate must be a number.")
+        return
+
+    if refresh_rate <= 0:
+        print("Refresh rate must be greater than 0.")
+        return
+
+    config = CONFIG.copy()
+    config["refresh_rate"] = refresh_rate
+
+    save_config(config)
+
+    print(f"Refresh rate set to {refresh_rate}s.")
+    print("Restart SysPanel to apply the change.")
 
 
 def main():
     parser = argparse.ArgumentParser(
         prog="syspanel",
-        description="External PC hardware monitor",
+        description="PC hardware monitor for external displays",
     )
 
     subparsers = parser.add_subparsers(
-        dest="command"
+        dest="command",
     )
 
     subparsers.add_parser(
         "start",
-        help="Start syspanel in the background",
+        help="Start SysPanel",
     )
 
     subparsers.add_parser(
         "stop",
-        help="Stop the background syspanel service",
+        help="Stop SysPanel",
     )
 
     subparsers.add_parser(
         "restart",
-        help="Restart the background syspanel service",
+        help="Restart SysPanel",
     )
 
     subparsers.add_parser(
         "run",
-        help="Run syspanel in the foreground",
+        help="Run SysPanel in the foreground",
     )
 
     subparsers.add_parser(
         "status",
-        help="Show hardware and display status",
+        help="Show SysPanel status",
     )
 
     subparsers.add_parser(
         "devices",
-        help="List connected displays",
+        help="Show detected devices",
     )
 
     subparsers.add_parser(
         "test",
-        help="Send a test screen to the display",
+        help="Send a test message to the display",
     )
 
-    subparsers.add_parser(
+    config_parser = subparsers.add_parser(
         "config",
-        help="Show syspanel configuration",
+        help="View or change configuration",
+    )
+
+    config_parser.add_argument(
+        "setting",
+        nargs="?",
+    )
+
+    config_parser.add_argument(
+        "value",
+        nargs="?",
     )
 
     args = parser.parse_args()
 
-    try:
-        if args.command == "start":
-            start_service()
+    if args.command == "start":
+        start_service()
 
-        elif args.command == "stop":
-            stop_service()
+    elif args.command == "stop":
+        stop_service()
 
-        elif args.command == "restart":
-            restart_service()
+    elif args.command == "restart":
+        restart_service()
 
-        elif args.command == "run":
-            run_monitor()
+    elif args.command == "run":
+        run_monitor()
 
-        elif args.command == "status":
-            show_status()
+    elif args.command == "status":
+        show_status()
 
-        elif args.command == "devices":
-            show_devices()
+    elif args.command == "devices":
+        show_devices()
 
-        elif args.command == "test":
-            test_display()
+    elif args.command == "test":
+        test_display()
 
-        elif args.command == "config":
+    elif args.command == "config":
+        if args.setting is None:
             show_config()
 
-        else:
-            parser.print_help()
+        elif args.setting == "refresh":
+            if args.value is None:
+                print(
+                    "Usage: syspanel config "
+                    "refresh <seconds>"
+                )
+            else:
+                set_refresh_rate(args.value)
 
-    except KeyboardInterrupt:
-        print("\nsyspanel stopped.")
+        else:
+            print(f"Unknown setting: {args.setting}")
+
+    else:
+        parser.print_help()
 
 
 if __name__ == "__main__":
