@@ -1,0 +1,7 @@
+Metadata-Version: 2.4
+Name: syspanel
+Version: 0.1.0
+Summary: A PC hardware monitor for external LCD and OLED displays
+Requires-Python: >=3.10
+Requires-Dist: psutil
+Requires-Dist: pyserial

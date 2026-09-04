@@ -1,0 +1,15 @@
+# Serial display
+ARDUINO_VID = 0x2341
+ARDUINO_PID = 0x0043
+
+BAUD_RATE = 9600
+
+# LCD
+LCD_COLUMNS = 20
+LCD_ROWS = 4
+
+# Monitor
+REFRESH_RATE = 1.0
+
+# GPU
+GPU_BACKEND = "nvidia"

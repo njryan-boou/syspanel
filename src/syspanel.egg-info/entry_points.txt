@@ -1,0 +1,2 @@
+[console_scripts]
+syspanel = syspanel.cli:main

@@ -1,0 +1,13 @@
+pyproject.toml
+src/syspanel/__init__.py
+src/syspanel/cli.py
+src/syspanel/config.py
+src/syspanel/monitor.py
+src/syspanel/sensors.py
+src/syspanel/serial_display.py
+src/syspanel.egg-info/PKG-INFO
+src/syspanel.egg-info/SOURCES.txt
+src/syspanel.egg-info/dependency_links.txt
+src/syspanel.egg-info/entry_points.txt
+src/syspanel.egg-info/requires.txt
+src/syspanel.egg-info/top_level.txt
